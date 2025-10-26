@@ -1,0 +1,185 @@
+-- ============================================
+-- SCHEMA: inventory_management
+-- ============================================
+
+-- Crear la base de datos (descomenta y ejecuta solo si no lo hiciste manualmente)
+-- CREATE DATABASE inventory_management;
+
+-- Conectarse a la base de datos (asegúrate de haber ejecutado \c inventory_management)
+
+-- 1. Tabla de Categorías
+CREATE TABLE categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Tabla de Productos
+CREATE TABLE products (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    sku VARCHAR(50) NOT NULL UNIQUE,
+    quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+    location VARCHAR(100) NOT NULL,
+    category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+    price DECIMAL(10, 2) NOT NULL CHECK (price > 0),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. Tabla de Pedidos (Orders)
+CREATE TABLE orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_number VARCHAR(50) NOT NULL UNIQUE,
+    customer VARCHAR(255) NOT NULL,
+    total DECIMAL(10, 2) NOT NULL CHECK (total >= 0),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' 
+        CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. Tabla de Items del Pedido (Order Items) - Relación muchos a muchos
+CREATE TABLE order_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
+    subtotal DECIMAL(10, 2) GENERATED ALWAYS AS (quantity * price) STORED,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5. Tabla de Historial de Inventario (para analytics por mes)
+CREATE TABLE inventory_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+    quantity INTEGER NOT NULL,
+    change_type VARCHAR(20) NOT NULL CHECK (change_type IN ('addition', 'sale', 'adjustment', 'return')),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- ÍNDICES para mejorar el rendimiento
+-- ============================================
+
+CREATE INDEX idx_products_category ON products(category_id);
+CREATE INDEX idx_products_sku ON products(sku);
+CREATE INDEX idx_products_quantity ON products(quantity);
+CREATE INDEX idx_orders_status ON orders(status);
+CREATE INDEX idx_orders_created_at ON orders(created_at);
+CREATE INDEX idx_order_items_order ON order_items(order_id);
+CREATE INDEX idx_order_items_product ON order_items(product_id);
+CREATE INDEX idx_inventory_history_product ON inventory_history(product_id);
+CREATE INDEX idx_inventory_history_created_at ON inventory_history(created_at);
+
+-- ============================================
+-- TRIGGERS para actualizar updated_at automáticamente
+-- ============================================
+
+-- Función para actualizar updated_at
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Aplicar trigger a las tablas
+CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- FUNCIÓN para generar número de orden automático
+-- ============================================
+
+CREATE OR REPLACE FUNCTION generate_order_number()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.order_number IS NULL THEN
+        NEW.order_number := 'ORD-' || LPAD(nextval('order_number_seq')::TEXT, 6, '0');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE SEQUENCE order_number_seq START 1;
+
+CREATE TRIGGER set_order_number BEFORE INSERT ON orders
+    FOR EACH ROW EXECUTE FUNCTION generate_order_number();
+
+-- ============================================
+-- VISTAS útiles para analytics
+-- ============================================
+
+-- Vista: Productos con su categoría y estado calculado
+CREATE OR REPLACE VIEW products_with_status AS
+SELECT 
+    p.id,
+    p.name,
+    p.sku,
+    p.quantity,
+    p.location,
+    c.name as category,
+    p.price,
+    CASE 
+        WHEN p.quantity = 0 THEN 'out_of_stock'
+        WHEN p.quantity <= 10 THEN 'low'
+        ELSE 'available'
+    END as status,
+    p.updated_at as "lastUpdated",
+    p.created_at
+FROM products p
+LEFT JOIN categories c ON p.category_id = c.id;
+
+-- Vista: Categorías con conteo de productos
+CREATE OR REPLACE VIEW categories_with_count AS
+SELECT 
+    c.id,
+    c.name,
+    c.description,
+    COUNT(p.id) as "productCount",
+    c.created_at as "createdAt"
+FROM categories c
+LEFT JOIN products p ON c.id = p.category_id
+GROUP BY c.id, c.name, c.description, c.created_at;
+
+-- Vista: Inventario por mes (últimos 12 meses)
+CREATE OR REPLACE VIEW inventory_by_month AS
+SELECT 
+    TO_CHAR(DATE_TRUNC('month', created_at), 'Mon') as month,
+    SUM(quantity) as quantity
+FROM inventory_history
+WHERE created_at >= CURRENT_DATE - INTERVAL '12 months'
+GROUP BY DATE_TRUNC('month', created_at)
+ORDER BY DATE_TRUNC('month', created_at);
+
+-- ============================================
+-- DATOS DE EJEMPLO (opcional)
+-- ============================================
+
+-- Insertar categorías de ejemplo
+INSERT INTO categories (name, description) VALUES
+    ('Camisas', 'Camisas y polos de todo tipo'),
+    ('Pantalones', 'Pantalones casuales y formales'),
+    ('Zapatos', 'Calzado deportivo y formal'),
+    ('Accesorios', 'Cinturones, carteras y más');
+
+-- Insertar productos de ejemplo
+INSERT INTO products (name, sku, quantity, location, category_id, price) VALUES
+    ('Camisa Polo Azul', 'CAM-001', 45, 'Almacén A-1', 
+     (SELECT id FROM categories WHERE name = 'Camisas'), 29.99),
+    ('Pantalón Jean Negro', 'PAN-001', 8, 'Almacén B-2', 
+     (SELECT id FROM categories WHERE name = 'Pantalones'), 49.99),
+    ('Zapatos Deportivos', 'ZAP-001', 0, 'Almacén C-3', 
+     (SELECT id FROM categories WHERE name = 'Zapatos'), 79.99);

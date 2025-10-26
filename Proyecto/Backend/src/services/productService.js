@@ -1,5 +1,14 @@
 const productDAL = require('../dal/productDAL');
-const { productToFrontend, productToDB } = require('../utils/transformers');
+const inventoryDAL = require('../dal/inventoryDAL');
+const { sequelize } = require('../models');
+
+// --- CAMBIO AQUÍ ---
+// Importamos los dos transformadores específicos en lugar del genérico
+const {
+    productToFrontend,
+    productToDB_Create,
+    productToDB_Update
+} = require('../utils/transformers');
 
 /**
  * Service Layer - Lógica de negocio
@@ -40,7 +49,9 @@ class ProductService {
         }
 
         // Transformar y crear
-        const dataToCreate = productToDB(productData);
+        // --- CAMBIO AQUÍ ---
+        // Usamos el transformador de CREACIÓN (que SÍ incluye la cantidad)
+        const dataToCreate = productToDB_Create(productData);
         const product = await productDAL.create(dataToCreate);
 
         return productToFrontend(product);
@@ -66,7 +77,9 @@ class ProductService {
         }
 
         // Transformar y actualizar
-        const dataToUpdate = productToDB(productData);
+        // --- CAMBIO AQUÍ ---
+        // Usamos el transformador de ACTUALIZACIÓN (que OMITE la cantidad)
+        const dataToUpdate = productToDB_Update(productData);
         const product = await productDAL.update(id, dataToUpdate);
 
         return productToFrontend(product);
@@ -108,6 +121,85 @@ class ProductService {
             lowStock: lowStockCount,
             outOfStock: 0 // TODO: implementar cuando sea necesario
         };
+    }
+
+    /**
+     * Añadir stock a un producto de forma transaccional
+     * @param {string} productId - ID del producto
+     * @param {Object} data - Datos de la entrada
+     * @param {number} data.quantity - Cantidad a añadir
+     * @param {string} [data.notes] - Notas opcionales
+     * @param {string} [data.userId] - ID del usuario (opcional)
+     * @returns {Promise<Object>} El producto actualizado
+     */
+    async addStockToProduct(productId, data) {
+        const { quantity, notes, userId } = data;
+
+        // Validaciones básicas
+        if (!quantity || quantity <= 0) {
+            throw new Error('La cantidad debe ser mayor a 0');
+        }
+
+        if (!Number.isInteger(quantity)) {
+            throw new Error('La cantidad debe ser un número entero');
+        }
+
+        // Iniciar transacción
+        const transaction = await sequelize.transaction();
+
+        try {
+            // 1. Obtener el stock actual del producto
+            const currentStock = await productDAL.getCurrentStock(productId, transaction);
+
+            // 2. Calcular el nuevo stock
+            const newStock = currentStock + quantity;
+
+            // 3. Actualizar el stock del producto
+            const updatedProduct = await productDAL.addStock(productId, quantity, transaction);
+
+            // 4. Registrar la entrada en el historial
+            await inventoryDAL.logEntry({
+                productId,
+                quantity,
+                changeType: 'addition',
+                previousStock: currentStock,
+                newStock: newStock,
+                notes,
+                userId
+            }, transaction);
+
+            // 5. Confirmar la transacción
+            await transaction.commit();
+
+            // 6. Retornar el producto actualizado
+            return productToFrontend(updatedProduct);
+
+        } catch (error) {
+            // 6. Revertir la transacción en caso de error
+            await transaction.rollback();
+            throw error;
+        }
+    }
+
+    /**
+     * Obtener el historial de inventario de un producto
+     * @param {string} productId - ID del producto
+     * @param {Object} [options] - Opciones de consulta
+     * @returns {Promise<Array>} Historial del producto
+     */
+    async getProductInventoryHistory(productId, options = {}) {
+        return await inventoryDAL.getProductHistory(productId, options);
+    }
+
+    /**
+     * Obtener estadísticas del historial de inventario
+     * @param {string} [productId] - ID del producto (opcional)
+     * @param {Date} [startDate] - Fecha de inicio (opcional)
+     * @param {Date} [endDate] - Fecha de fin (opcional)
+     * @returns {Promise<Object>} Estadísticas del historial
+     */
+    async getInventoryHistoryStats(productId, startDate, endDate) {
+        return await inventoryDAL.getHistoryStats(productId, startDate, endDate);
     }
 }
 

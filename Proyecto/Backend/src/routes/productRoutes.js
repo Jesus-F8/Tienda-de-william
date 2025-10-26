@@ -1,7 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/productController');
-const { validateProduct, validateId } = require('../middlewares/validators/productValidator');
+
+// --- CAMBIO AQUÍ ---
+// Importamos los nuevos validadores específicos
+const {
+    validateProductCreation,
+    validateProductUpdate,
+    validateId,
+    validateStockAddition
+} = require('../middlewares/validators/productValidator');
 
 /**
  * Rutas para productos
@@ -17,12 +25,25 @@ router.get('/search', productController.searchProducts);
 router.get('/:id', validateId, productController.getProductById);
 
 // POST /api/products - Crear nuevo producto
-router.post('/', validateProduct, productController.createProduct);
+// --- CAMBIO AQUÍ ---
+// Usamos el validador de CREACIÓN
+router.post('/', validateProductCreation, productController.createProduct);
 
 // PUT /api/products/:id - Actualizar producto
-router.put('/:id', validateId, validateProduct, productController.updateProduct);
+// --- CAMBIO AQUÍ ---
+// Usamos el validador de ACTUALIZACIÓN (que no valida 'quantity')
+router.put('/:id', validateId, validateProductUpdate, productController.updateProduct);
 
 // DELETE /api/products/:id - Eliminar producto
 router.delete('/:id', validateId, productController.deleteProduct);
+
+// POST /api/products/:id/add-stock - Añadir stock a un producto
+router.post('/:id/add-stock', validateId, validateStockAddition, productController.addStock);
+
+// GET /api/products/:id/inventory-history - Obtener historial de inventario
+router.get('/:id/inventory-history', validateId, productController.getInventoryHistory);
+
+// GET /api/products/inventory-stats - Obtener estadísticas de inventario
+router.get('/inventory-stats', productController.getInventoryStats);
 
 module.exports = router;

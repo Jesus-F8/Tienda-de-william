@@ -8,6 +8,8 @@ const Category = require('./Category');
 const Product = require('./Product');
 const Order = require('./Order');
 const OrderItem = require('./OrderItem');
+const Settings = require('./Settings');
+const InventoryHistory = require('./InventoryHistory'); // <-- ¡NUEVO!
 
 // --- 2. DEFINIR ASOCIACIONES ---
 
@@ -38,11 +40,25 @@ OrderItem.belongsTo(Product, {
     foreignKey: 'product_id'
 });
 
+// Asociación 1:N (Producto <-> Historial de Inventario)
+Product.hasMany(InventoryHistory, {
+    foreignKey: 'product_id',
+    as: 'inventoryHistory'
+});
+InventoryHistory.belongsTo(Product, {
+    foreignKey: 'product_id',
+    as: 'product'
+});
+
+// (Settings no tiene asociaciones con las otras tablas)
+
 // --- 3. EXPORTAR TODO ---
 module.exports = {
     sequelize,
     Category,
     Product,
     Order,
-    OrderItem
+    OrderItem,
+    Settings,
+    InventoryHistory // <-- ¡NUEVO!
 };

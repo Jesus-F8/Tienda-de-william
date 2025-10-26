@@ -1,17 +1,31 @@
-"use client"
+"use client";
 
-import { MoreHorizontal, Eye, Edit, Trash2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import type { Order } from "@/lib/api/orders"
+import { MoreHorizontal, Eye, Edit, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import type { Order } from "@/lib/api/orders";
+// --- 1. IMPORTAR EL HOOK DE MONEDA ---
+import { useCurrency } from "@/app/contexts/CurrencyContext";
 
 interface OrdersTableProps {
-  orders: Order[]
-  onEdit: (order: Order) => void
-  onDelete: () => void
-  isLoading?: boolean
+  orders: Order[];
+  onEdit: (order: Order) => void;
+  onDelete: () => void;
+  isLoading?: boolean;
 }
 
 const statusColors = {
@@ -20,15 +34,24 @@ const statusColors = {
   shipped: "bg-purple-100 text-purple-800 border-purple-200",
   delivered: "bg-green-100 text-green-800 border-green-200",
   cancelled: "bg-red-100 text-red-800 border-red-200",
-}
+};
 
-export function OrdersTable({ orders, onEdit, onDelete, isLoading }: OrdersTableProps) {
+export function OrdersTable({
+  orders,
+  onEdit,
+  onDelete,
+  isLoading,
+}: OrdersTableProps) {
+  // --- 2. LLAMAR AL HOOK ---
+  // Obtenemos la función 'formatPrice' del contexto
+  const { formatPrice } = useCurrency();
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <p className="text-muted-foreground">Cargando pedidos...</p>
       </div>
-    )
+    );
   }
 
   return (
@@ -49,7 +72,11 @@ export function OrdersTable({ orders, onEdit, onDelete, isLoading }: OrdersTable
             <TableCell className="font-medium">{order.orderNumber}</TableCell>
             <TableCell>{order.customer}</TableCell>
             <TableCell>{new Date(order.date).toLocaleDateString()}</TableCell>
-            <TableCell>${order.total.toLocaleString()}</TableCell>
+
+            {/* --- 3. USAR LA FUNCIÓN --- */}
+            {/* Reemplazamos el formato manual por nuestra función global */}
+            <TableCell>{formatPrice(order.total)}</TableCell>
+
             <TableCell>
               <Badge variant="outline" className={statusColors[order.status]}>
                 {order.status === "pending" && "Pendiente"}
@@ -86,5 +113,5 @@ export function OrdersTable({ orders, onEdit, onDelete, isLoading }: OrdersTable
         ))}
       </TableBody>
     </Table>
-  )
+  );
 }

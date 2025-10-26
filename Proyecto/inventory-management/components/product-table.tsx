@@ -8,6 +8,8 @@ import type { Product } from "@/lib/api/products";
 import { deleteProduct } from "@/lib/api/products";
 import { DeleteConfirmationModal } from "./delete-confirmation-modal";
 import { useToast } from "@/hooks/use-toast";
+// --- 1. IMPORTAR EL HOOK DE MONEDA ---
+import { useCurrency } from "@/app/contexts/CurrencyContext";
 
 interface ProductTableProps {
   products: Product[];
@@ -23,6 +25,8 @@ export function ProductTable({
   isLoading,
 }: ProductTableProps) {
   const { toast } = useToast();
+  // --- 2. LLAMAR AL HOOK ---
+  const { formatPrice } = useCurrency();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -48,7 +52,8 @@ export function ProductTable({
     } catch (error) {
       toast({
         title: "Error",
-        description: "Hubo un error al eliminar el producto.",
+        description:
+          (error as Error).message || "Hubo un error al eliminar el producto.",
         variant: "destructive",
       });
     } finally {
@@ -144,9 +149,12 @@ export function ProductTable({
                 <td className="py-4 text-sm text-foreground">
                   {product.quantity}
                 </td>
+
+                {/* --- 3. USAR LA FUNCIÓN --- */}
                 <td className="py-4 text-sm text-foreground">
-                  ${product.price.toFixed(2)}
+                  {formatPrice(product.price)}
                 </td>
+
                 <td className="py-4">{getStatusBadge(product.status)}</td>
                 <td className="py-4 pr-6 text-right">
                   <div className="flex justify-end gap-2">

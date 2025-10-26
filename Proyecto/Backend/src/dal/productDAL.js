@@ -110,6 +110,52 @@ class ProductDAL {
             }
         });
     }
+
+    /**
+     * Añadir stock a un producto de forma segura
+     * @param {string} productId - ID del producto
+     * @param {number} quantity - Cantidad a añadir
+     * @param {Object} transaction - Transacción de Sequelize
+     * @returns {Promise<Object>} El producto actualizado
+     */
+    async addStock(productId, quantity, transaction) {
+        // Obtener el producto actual para verificar que existe
+        const product = await Product.findByPk(productId, { transaction });
+        if (!product) {
+            throw new Error('Producto no encontrado');
+        }
+
+        // Actualizar la cantidad usando sequelize.literal para evitar condiciones de carrera
+        await Product.update(
+            { quantity: require('sequelize').literal(`quantity + ${quantity}`) },
+            {
+                where: { id: productId },
+                transaction
+            }
+        );
+
+        // Recargar el producto actualizado con categoría
+        return await this.findById(productId);
+    }
+
+    /**
+     * Obtener el stock actual de un producto
+     * @param {string} productId - ID del producto
+     * @param {Object} transaction - Transacción de Sequelize (opcional)
+     * @returns {Promise<number>} Stock actual
+     */
+    async getCurrentStock(productId, transaction = null) {
+        const product = await Product.findByPk(productId, {
+            attributes: ['quantity'],
+            transaction
+        });
+
+        if (!product) {
+            throw new Error('Producto no encontrado');
+        }
+
+        return product.quantity;
+    }
 }
 
 module.exports = new ProductDAL();

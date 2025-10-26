@@ -1,5 +1,3 @@
-// En: src/utils/transformers.js (CORREGIDO)
-
 /**
  * Transformadores de datos entre Base de Datos y Frontend
  * Centraliza la lógica de conversión de formatos
@@ -15,8 +13,6 @@ function productToFrontend(product) {
         id: data.id,
         name: data.name,
         sku: data.sku,
-        // --- CAMBIO AQUÍ ---
-        // La clave ahora es 'quantity' para que coincida con el frontend
         quantity: data.quantity,
         location: data.location,
         category: data.categoryData?.name || 'Sin categoría',
@@ -27,15 +23,29 @@ function productToFrontend(product) {
 }
 
 /**
- * Transforma datos del Frontend a formato DB
+ * Transforma datos del Frontend a formato DB para CREAR
+ * (Incluye la cantidad)
  */
-function productToDB(frontendData) {
+function productToDB_Create(frontendData) {
     return {
         name: frontendData.name,
         sku: frontendData.sku,
-        // --- CAMBIO AQUÍ ---
-        // Ahora esperamos 'quantity' del frontend
-        quantity: frontendData.quantity,
+        quantity: frontendData.quantity, // <-- La cantidad SÍ está aquí
+        location: frontendData.location,
+        price: frontendData.price,
+        categoryId: frontendData.categoryId || null
+    };
+}
+
+/**
+ * Transforma datos del Frontend a formato DB para ACTUALIZAR
+ * (Omite la cantidad)
+ */
+function productToDB_Update(frontendData) {
+    return {
+        name: frontendData.name,
+        sku: frontendData.sku,
+        // <-- 'quantity' se omite intencionalmente
         location: frontendData.location,
         price: frontendData.price,
         categoryId: frontendData.categoryId || null
@@ -52,7 +62,6 @@ function categoryToFrontend(category) {
         id: data.id,
         name: data.name,
         description: data.description,
-        // Corregido para manejar 'productCount' si viene de una vista/conteo
         productCount: data.productCount || data.products?.length || 0,
         createdAt: data.created_at
     };
@@ -70,7 +79,8 @@ function categoryToDB(frontendData) {
 
 module.exports = {
     productToFrontend,
-    productToDB,
+    productToDB_Create, // <-- Nuevo
+    productToDB_Update, // <-- Renombrado
     categoryToFrontend,
     categoryToDB
 };

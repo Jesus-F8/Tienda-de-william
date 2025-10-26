@@ -82,3 +82,68 @@ exports.searchProducts = async (req, res, next) => {
         next(error);
     }
 };
+
+/**
+ * POST /api/products/:id/add-stock
+ * Añadir stock a un producto existente
+ */
+exports.addStock = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { quantity, notes, userId } = req.body;
+
+        const updatedProduct = await productService.addStockToProduct(id, {
+            quantity,
+            notes,
+            userId
+        });
+
+        res.status(200).json({
+            message: 'Stock añadido exitosamente',
+            product: updatedProduct
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * GET /api/products/:id/inventory-history
+ * Obtener el historial de inventario de un producto
+ */
+exports.getInventoryHistory = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { limit = 50, offset = 0, changeType } = req.query;
+
+        const history = await productService.getProductInventoryHistory(id, {
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            changeType
+        });
+
+        res.json(history);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * GET /api/products/inventory-stats
+ * Obtener estadísticas del historial de inventario
+ */
+exports.getInventoryStats = async (req, res, next) => {
+    try {
+        const { productId, startDate, endDate } = req.query;
+
+        const stats = await productService.getInventoryHistoryStats(
+            productId,
+            startDate ? new Date(startDate) : undefined,
+            endDate ? new Date(endDate) : undefined
+        );
+
+        res.json(stats);
+    } catch (error) {
+        next(error);
+    }
+};
