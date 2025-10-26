@@ -32,6 +32,7 @@ if (process.env.NODE_ENV === 'development') {
 // Rutas
 app.use('/api', routes);
 
+
 // Ruta de prueba
 app.get('/', (req, res) => {
     res.json({

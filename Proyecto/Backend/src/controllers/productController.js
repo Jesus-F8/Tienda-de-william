@@ -34,6 +34,7 @@ exports.getProductById = async (req, res, next) => {
  */
 exports.createProduct = async (req, res, next) => {
     try {
+
         const product = await productService.createProduct(req.body);
         res.status(201).json(product);
     } catch (error) {

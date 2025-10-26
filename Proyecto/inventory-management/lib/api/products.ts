@@ -98,28 +98,16 @@ export async function createProduct(
       body: JSON.stringify(data),
     });
 
+    console.log("EL ERROR FEO ES: ", response);
+
     if (!response.ok) {
       throw new Error("Failed to create product");
     }
 
     return await parseResponse<Product>(response);
   } catch (error) {
-    console.warn(
-      "[v0] Backend not available, simulating product creation:",
-      error
-    );
-    const newProduct: Product = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...data,
-      status:
-        data.quantity === 0
-          ? "out_of_stock"
-          : data.quantity < 10
-          ? "low_stock"
-          : "in_stock",
-      lastUpdated: new Date().toISOString(),
-    };
-    return newProduct;
+    console.error("Error en createProduct:", error);
+    throw error;
   }
 }
 
@@ -142,26 +130,8 @@ export async function updateProduct(
 
     return await parseResponse<Product>(response);
   } catch (error) {
-    console.warn(
-      "[v0] Backend not available, simulating product update:",
-      error
-    );
-    const existingProduct = MOCK_PRODUCTS.find((p) => p.id === data.id);
-    if (!existingProduct) {
-      throw new Error("Product not found");
-    }
-    const updatedProduct: Product = {
-      ...existingProduct,
-      ...data,
-      status:
-        (data.quantity ?? existingProduct.quantity) === 0
-          ? "out_of_stock"
-          : (data.quantity ?? existingProduct.quantity) < 10
-          ? "low_stock"
-          : "in_stock",
-      lastUpdated: new Date().toISOString(),
-    };
-    return updatedProduct;
+    console.error("Error en updateProduct:", error);
+    throw error;
   }
 }
 
@@ -179,10 +149,8 @@ export async function deleteProduct(id: string): Promise<void> {
       throw new Error("Failed to delete product");
     }
   } catch (error) {
-    console.warn(
-      "[v0] Backend not available, simulating product deletion:",
-      error
-    );
+    console.error("Error en deleteProduct:", error);
+    throw error;
   }
 }
 
